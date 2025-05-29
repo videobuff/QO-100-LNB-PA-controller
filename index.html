@@ -1,0 +1,90 @@
+<!-- File amended on: 2025-05-29 09:22 AM CEST -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QO-100 LNB/PA Controller</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header>
+        <h1>QO-100 LNB/PA Controller</h1>
+        <div id="utcTime" class="clock-text">UTC: Loading...</div>
+    </header>
+
+    <main>
+        <div class="gauge-wrapper">
+            <img id="gaugeImage" src="/meter-satpwr.png" alt="Gauge Background" class="gauge-bg">
+            <svg id="gaugeOverlay" class="gauge-overlay">
+                <rect id="needleForward" x="0" y="45" width="2" height="40" fill="#000000" />
+                <rect id="needleReflected" x="0" y="180" width="2" height="40" fill="#000000" />
+            </svg>
+        </div>
+
+        <div class="power-metrics-container">
+            <div id="forwardBox" class="meter-box bg-dark text-light">FOR: 0.0 W</div>
+            <div id="reflectedBox" class="meter-box bg-dark text-light">REF: 0.0 W</div>
+            <div id="swrBox" class="meter-box bg-dark text-light swr-color-box">SWR: 1.0</div>
+            <div id="tempBox" class="meter-box bg-dark text-light">TEMP: 25.0°C</div>
+        </div>
+
+        <div class="controls-container">
+            <div class="control-group">
+                <button id="mainPaToggle" class="toggle-switch bg-success">MAIN PA<br><span id="mainPaState">ON</span></button>
+            </div>
+            <div class="control-group">
+                <button id="togglePol" class="toggle-switch bg-success">MODE<br><span id="togglePolState">SSB</span></button>
+            </div>
+        </div>
+
+        <div class="status-settings-container">
+            <div class="ws-status">
+                WS-CON
+                <span id="wsStatusDot" class="dot" style="background-color: orange;"></span>
+            </div>
+            <button onclick="toggleSettings()" class="toggle-switch bg-primary">SETTINGS</button>
+            <button onclick="toggleOtaForm()" class="toggle-switch bg-primary">OTA UPDATE</button>
+        </div>
+
+        <div id="settingsForm" class="form-group" style="display: none;">
+            <h2>Gauge Settings</h2>
+            <label for="forwardMax">Forward Power Max (W):</label>
+            <input type="number" id="forwardMax" value="50" step="1">
+            <label for="reflectedMax">Reflected Power Max (W):</label>
+            <input type="number" id="reflectedMax" value="25" step="1">
+            <label for="needleColor">Needle Color:</label>
+            <input type="color" id="needleColor" value="#000000">
+            <label for="needleThickness">Needle Thickness (px):</label>
+            <input type="number" id="needleThickness" value="2" min="1" max="10">
+            <label for="swrThreshold">SWR Threshold (PA OFF):</label>
+            <input type="number" id="swrThreshold" value="3" step="0.1" min="1.5" max="10">
+            <button id="saveSettingsButton" class="toggle-switch bg-primary">Save Settings</button>
+            <button onclick="applySettings()" class="toggle-switch bg-primary">Apply Settings</button>
+        </div>
+
+        <div id="otaForm" class="form-group" style="display: none;">
+            <h2>OTA Update</h2>
+            <button onclick="checkForUpdate()" class="toggle-switch bg-primary">Check for Update</button>
+            <label for="otaUrl">OTA URL:</label>
+            <input type="text" id="otaUrl" placeholder="http://example.com/firmware.bin">
+            <button onclick="performUpdate()" class="toggle-switch bg-primary">Update</button>
+            <button onclick="rollbackFirmware()" class="toggle-switch bg-primary">Rollback</button>
+        </div>
+
+        <div id="otaProgress" class="alert alert-info" style="display: none;">
+            <span>Firmware update in progress...</span>
+            <div style="width: 100%; background-color: #444; border-radius: 5px; margin-top: 5px;">
+                <div id="otaProgressBarFill" style="width: 0%; height: 10px; background-color: #007bff; border-radius: 5px;"></div>
+            </div>
+            <button type="button" class="alert-close" onclick="hideOtaProgress()">×</button>
+        </div>
+    </main>
+
+    <footer>
+        <div id="firmwareVersion">Firmware Version: Loading... — PA0ESH</div>
+    </footer>
+
+    <script src="/script.js"></script>
+</body>
+</html>

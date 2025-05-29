@@ -1,0 +1,202 @@
+/* File amended on: 2025-05-29 09:16 AM CEST */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: #1a1a1a;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+header {
+  text-align: center;
+  padding: 10px;
+  background-color: #333;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.5em;
+}
+
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+}
+
+footer {
+  text-align: center;
+  padding: 10px;
+  background-color: #333;
+  font-size: 0.9em;
+}
+
+.clock-text {
+  font-size: 1.4em; /* Bijna even groot als h1 (1.5em) */
+  margin: 5px 0 0 0;
+}
+
+.gauge-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  margin-bottom: 20px;
+}
+
+.gauge-bg {
+  width: 100%;
+  height: auto;
+}
+
+.gauge-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.power-metrics-container {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.meter-box {
+  padding: 10px 15px;
+  border: 2px solid #444; /* Added border for FOR, REF, SWR, TEMP boxes */
+  border-radius: 5px;
+  font-size: 1em;
+  min-width: 120px;
+  text-align: center;
+}
+
+.controls-container {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.toggle-switch {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 5px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.status-settings-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.ws-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 2px solid orange; /* Orange border for WS-CON */
+  border-radius: 5px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot.pulse {
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.form-group {
+  background-color: #333;
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.form-group h2 {
+  margin: 0 0 10px 0;
+  font-size: 1.2em;
+}
+
+.form-group label {
+  display: block;
+  margin: 5px 0;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 5px;
+  margin-bottom: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  background-color: #444;
+  color: #fff;
+}
+
+.alert {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+}
+
+.alert-close {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.2em;
+  cursor: pointer;
+}
+
+.bg-primary { background-color: #007bff; color: #fff; }
+.bg-success { background-color: #28a745; color: #fff; }
+.bg-danger { background-color: #dc3545; color: #fff; }
+.bg-dark { background-color: #222; }
+.text-light { color: #ddd; }
+
+.alert-info { background-color: #17a2b8; color: #fff; }
+.alert-success { background-color: #28a745; color: #fff; }
+.alert-warning { background-color: #ffc107; color: #000; }
+.alert-danger { background-color: #dc3545; color: #fff; }
+
+.swr-color-box.swr-green { background-color: #28a745; }
+.swr-color-box.swr-orange { background-color: #ff8c00; }
+.swr-color-box.swr-red { background-color: #dc3545; }
