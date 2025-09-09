@@ -46,4 +46,4 @@ The QO-100 LNB/PA Controller is designed to control the polarisation and PA rela
 - No meter movement: check WS-CON indicator
 - After Save no change: hard refresh (Ctrl+F5 / Cmd+Shift+R)
 - No Wi-Fi: reconnect to AP and configure Wi-Fi again
-<img width="470" height="645" alt="image" src="https://github.com/user-attachments/assets/981281bb-4d0a-46b7-b33d-dca0e02c200b" />
+
