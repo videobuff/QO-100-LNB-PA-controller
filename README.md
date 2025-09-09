@@ -1,4 +1,62 @@
 ### Description of QO-100 LNB & PA Controller Functionality
+## Introduction
+The QO-100 LNB/PA Controller is designed to control the polarisation and PA relay, measure forward/reflected power and DC rails, and protect against high SWR. It includes a built-in Wi-Fi web interface and a simulation mode for testing without hardware.
+
+## Hardware requirements
+- **ESP32 Microcontroller**: Serves as the core hardware, handling Wi-Fi connectivity, GPIO control, and ADC readings for power and temperature.
+- **Relay Modules**: One for the LNB polarization switch (connected to a GPIO pin, e.g., D14) and one for the PA (connected to another GPIO pin, e.g., D26).
+- **Power Sensors**: Analog sensors (e.g., AD8307 or similar) connected to ADC pins (e.g., GPIO 34 for forward power, GPIO 35 for reflected power) to measure power levels.
+- **Temperature Sensor**: Optional (e.g., DS18B20) for PA temperature monitoring, connected to a GPIO pin.
+- **Power Supply**: Suitable voltage supply for the ESP32, relays, and connected devices.
+- **LittleFS Storage**: Required for storing the web interface files (`index.html`, `script.js`, `style.css`, and `meter-satpwr.png`).
+- **Wiring and Connectors or a PCB (later stadium)
+## Functionality
+- Forward/Reflected power and SWR monitoring with protection
+- Main PA relay switching with SWR protection
+- Polarisation relay (SSB/DATV)
+- DC rails monitoring (5V, 12V, 18V, 28V)
+- PA temperature monitoring
+- Adjustable settings for thresholds, needle appearance, and calibration factors
+- Stored in Preferences (persistent)
+- OTA Update support
+- Simulation mode for testing without hardware
+Installation from blank ESP32
+1. Install Arduino IDE 2.x and ESP32 board support.
+2. Connect ESP32 via USB.
+3. Select board: ESP32 Dev Module.
+4. Select partition scheme: Default 4MB with spiffs.
+5. Upload firmware (polarisation_xx.ino).
+6. Upload web files via Tools → ESP32 Sketch Data Upload.
+7. Reboot ESP32. If no Wi-Fi found, it creates AP 'QO100-Controller-xxxx'. Connect and configure Wi-Fi.
+8. Log in via browser (default user: admin, password: password).
+## Usage
+- Dashboard: shows power, SWR and temperature
+- Controls: Main PA ON/OFF and mode toggle
+- SWR colour indication (green, orange, red) with latch protection
+- Settings: adjustable and stored persistently
+- OTA Update: upload new firmware
+- Simulation mode: test without hardware
+
+## Hardware connections
+- GPIO14 → PA relay
+- GPIO26 → Polarisation relay
+- GPIO32–39 → ADC1 inputs for voltage monitoring
+- GPIO4 → Recovery pin (resets login)
+## Voltage dividers:
+- 5V: 15k/22k
+- 12V: 68k/22k
+- 18V: 120k/22k
+- 28V: 200k/22k
+## Troubleshooting
+- 'Not found': LittleFS upload failed or wrong FS used
+- No meter movement: check WS-CON indicator
+- After Save no change: hard refresh (Ctrl+F5 / Cmd+Shift+R)
+- No Wi-Fi: reconnect to AP and configure Wi-Fi again
+<img width="470" height="645" alt="image" src="https://github.com/user-attachments/assets/2b751308-c706-4048-98b4-ca1817e95ebb" />
+
+
+
+### Description of QO-100 LNB & PA Controller Functionality
 
 The QO-100 LNB & PA Controller is a web-based interface designed to manage and monitor a Low-Noise Block downconverter (LNB) and Power Amplifier (PA) for the QO-100 satellite, a geostationary amateur radio transponder. It provides real-time monitoring of forward and reflected power, SWR (Standing Wave Ratio), and PA temperature, displayed on a customizable gauge. Users can toggle the PA and polarization modes (SSB/DATV) remotely, set SWR thresholds for automatic PA shutdown, and perform over-the-air (OTA) firmware updates. The system includes a WebSocket connection for live data updates, a settings panel for gauge configuration, and alerts for critical conditions like high SWR or temperature.
 
