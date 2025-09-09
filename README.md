@@ -1,5 +1,9 @@
 ## Introduction
 The QO-100 LNB/PA Controller is designed to control the polarisation and PA relay, measure forward/reflected power and DC rails, and protect against high SWR. It includes a built-in Wi-Fi web interface and a simulation mode for testing without hardware.
+
+![Webinterface - layout qo-100 controller](https://github.com/user-attachments/assets/0a60077f-b7f8-4a03-b4a6-5238126e9da7)
+
+
 ## Functionality
 - Forward/Reflected power and SWR monitoring with protection
 - Main PA relay switching with SWR protection
