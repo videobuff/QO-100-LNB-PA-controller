@@ -1,3 +1,11 @@
+
+Release: v15
+Author: Erik Schott - PA0ESH
+Mail: info@pa0esh.com
+Licensing: Gpl V3.0 see LICENSE file.
+Languages: This application is written in Arduino code, Javascript and HTML
+
+
 ## Introduction
 The QO-100 LNB/PA Controller is designed to control the polarisation and PA relay, measure forward/reflected power and DC rails, and protect against high SWR. It includes a built-in Wi-Fi web interface and a simulation mode for testing without hardware.
 
