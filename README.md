@@ -52,14 +52,5 @@ The QO-100 LNB/PA Controller is designed to control the polarisation and PA rela
 - No meter movement: check WS-CON indicator
 - After Save no change: hard refresh (Ctrl+F5 / Cmd+Shift+R)
 - No Wi-Fi: reconnect to AP and configure Wi-Fi again
-<img width="470" height="645" alt="image" src="https://github.com/user-attachments/assets/2b751308-c706-4048-98b4-ca1817e95ebb" />
-
-
-
-### Description of QO-100 LNB & PA Controller Functionality
-
-The QO-100 LNB & PA Controller is a web-based interface designed to manage and monitor a Low-Noise Block downconverter (LNB) and Power Amplifier (PA) for the QO-100 satellite, a geostationary amateur radio transponder. It provides real-time monitoring of forward and reflected power, SWR (Standing Wave Ratio), and PA temperature, displayed on a customizable gauge. Users can toggle the PA and polarization modes (SSB/DATV) remotely, set SWR thresholds for automatic PA shutdown, and perform over-the-air (OTA) firmware updates. The system includes a WebSocket connection for live data updates, a settings panel for gauge configuration, and alerts for critical conditions like high SWR or temperature.
-
----
 
 
