@@ -1,9 +1,9 @@
 
-Release: v15
-Author: Erik Schott - PA0ESH
-Mail: info@pa0esh.com
-Licensing: Gpl V3.0 see LICENSE file.
-Languages: This application is written in Arduino code, Javascript and HTML
+# Release: v15
+# Author: Erik Schott - PA0ESH
+# Mail: info@pa0esh.com
+# Licensing: Gpl V3.0 see LICENSE file.
+# Languages: This application is written in Arduino code, Javascript and HTML
 
 
 ## Introduction
