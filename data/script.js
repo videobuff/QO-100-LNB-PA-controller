@@ -1,404 +1,411 @@
-/*
- * Project: QO-100 LNB/PA Controller
- * Author: PA0ESH (Erik Schott)
- * Year: 2025
- * License: MIT
- * Version: 015
- */
+// =========================
+// QO-100 Controller v018.6
+// =========================
 
-console.log("[UI] v015 booting…");
+// ---- AUTH (pas aan als je login wijzigde in firmware) ----
+const AUTH = { user: "admin", pass: "password" };
+const JSON_HEADERS = () => ({
+  "Content-Type": "application/json",
+  "Authorization": "Basic " + btoa(`${AUTH.user}:${AUTH.pass}`)
+});
+const AUTH_HEADERS = () => ({
+  "Authorization": "Basic " + btoa(`${AUTH.user}:${AUTH.pass}`)
+});
 
+// ---- Global state ----
 let swrLatched = false;
 let wsConnected = false;
-let mainPaState = false;
+let mainPaState = false; // OFF
+let mode = "SSB";        // "SSB" of "DATV"
+let simMode = false;
 let isSaving = false;
+let lastSettings = {};   // UI-bron van waarheid
 
+// Gauge X-config (Y/H via updateGaugeDimensions)
 const gaugeConfig = {
-  forward:   { min: 0, max: 50, startX: 48 / 1100, endX: 1050 / 1100 },
-  reflected: { min: 0, max: 25, startX: 48 / 1100, endX: 1050 / 1100 }
+  forward:   { min: 0, max: 50, startX: 38/1100,  endX: 1050/1100 },
+  reflected: { min: 0, max: 25, startX: 38/1100,  endX: 1050/1100 }
 };
 
-// Netjes instelbare naald-offsets
-const needleLayout = {
-  baseImageHeight: 300,
-  forY: 35,    forYOffset: 20,
-  refY: 175,   refYOffset: 16
-};
+// ---- DOM helpers ----
+const $ = id => document.getElementById(id);
 
-function fetchNoCache(url, options={}) {
-  const headers = Object.assign({ 'Cache-Control': 'no-store' }, options.headers || {});
-  return fetch(url, Object.assign({}, options, { headers })).then(async res=>{
-    const ct = res.headers.get('content-type')||"";
-    const body = ct.includes('application/json') ? await res.clone().json().catch(()=>null)
-                                                 : await res.clone().text().catch(()=>null);
-    if (!res.ok) throw new Error(`HTTP ${res.status} on ${url}`);
-    return {res, body};
-  });
+// ---- Modal helpers ----
+function modalShow(msg, title = "Melding") {
+  $("modalTitle").textContent = title || "Melding";
+  $("modalBody").textContent  = msg || "";
+  $("modal").classList.remove("hidden");
 }
+function modalHide() {
+  $("modal").classList.add("hidden");
+}
+function showAlert(message, type="Info"){ modalShow(message, type); }
 
-function setAlertOffset() {
-  const header = document.getElementById('pageHeader');
-  const h = header ? header.getBoundingClientRect().height : 64;
-  document.documentElement.style.setProperty('--alertTop', (h + 12) + 'px');
-}
-function showAlert(msg, type="danger") {
-  setAlertOffset();
-  const anchor = document.getElementById('alertAnchor') || document.body;
-  const div = document.createElement("div");
-  div.className = `alert alert-${type}`;
-  div.innerHTML = `<span>${msg}</span><button class="alert-close" aria-label="Close">×</button>`;
-  anchor.appendChild(div);
-  div.querySelector(".alert-close").addEventListener("click", () => div.remove());
-  setTimeout(()=>div.remove(), 4000);
-}
-
-function updateUTCTime() {
-  const el = document.getElementById("utcTime");
-  if (!el) return;
+// ---- Clock ----
+function updateUTCTime(){
+  const el = $("utcTime");
   const n = new Date();
-  const M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  el.textContent = `UTC: ${n.getUTCDate()}-${M[n.getUTCMonth()]}-${n.getUTCFullYear()} ${String(n.getUTCHours()).padStart(2,'0')}:${String(n.getUTCMinutes()).padStart(2,'0')}`;
+  const dd = String(n.getUTCDate()).padStart(2,'0');
+  const mm = String(n.getUTCMonth()+1).padStart(2,'0');
+  const yy = n.getUTCFullYear();
+  const hh = String(n.getUTCHours()).padStart(2,'0');
+  const mi = String(n.getUTCMinutes()).padStart(2,'0');
+  el.textContent = `UTC: ${dd}-${mm}-${yy} ${hh}:${mi}`;
   setTimeout(updateUTCTime, 1000);
 }
 
-function updateGaugeDimensions() {
-  const img = document.getElementById("gaugeImage");
-  const svg = document.getElementById("gaugeOverlay");
-  const nf  = document.getElementById("needleForward");
-  const nr  = document.getElementById("needleReflected");
-  if (!img || !svg || !nf || !nr) return 0;
+// ---- Gauge layout (Y/H) — beide naalden 10px omlaag ----
+function updateGaugeDimensions(){
+  const img = $("gaugeImage");
+  const overlay = $("gaugeOverlay");
+  if (!img || !overlay) return;
 
-  const w = img.clientWidth, h = img.clientHeight;
-  svg.setAttribute("width", w); svg.setAttribute("height", h);
+  const w = img.clientWidth;
+  const h = img.clientHeight || (img.naturalHeight * (w / img.naturalWidth));
+  overlay.setAttribute("width", w);
+  overlay.setAttribute("height", h);
 
-  const scaleY = h / needleLayout.baseImageHeight;
-  nf.setAttribute("y", (needleLayout.forY * scaleY) + needleLayout.forYOffset);
-  nf.setAttribute("height", 80 * scaleY);
-  nr.setAttribute("y", (needleLayout.refY * scaleY) + needleLayout.refYOffset);
-  nr.setAttribute("height", 80 * scaleY);
+  const scaleY = h / 300;
+  const shift = 10 * scaleY;
 
-  return w;
+  const nf = $("needleForward");
+  const nr = $("needleReflected");
+
+  nf.setAttribute("y", (35 * scaleY) + shift);
+  nf.setAttribute("height", (80 * scaleY));
+
+  nr.setAttribute("y", (175 * scaleY) + shift);
+  nr.setAttribute("height", (80 * scaleY));
 }
 
-function updateNeedle(cfg, value, needleId, labelId, labelText) {
-  const w = updateGaugeDimensions(); if (w === 0) return;
+// ---- Needles: X, dikte, kleur (inline style wint van CSS) ----
+function updateNeedle(config, value, needleId, labelId, labelText){
+  const img = $("gaugeImage");
+  const needle = $(needleId);
+  const label = $(labelId);
+  if (!img || !needle || !label) return;
 
-  const start = cfg.startX * w, end = cfg.endX * w;
-  const clamped = Math.max(cfg.min, Math.min(value, cfg.max));
-  const frac = (clamped - cfg.min) / (cfg.max - cfg.min);
-  const x = start + frac * (end - start);
+  const w = img.clientWidth;
+  const x0 = config.startX * w;
+  const x1 = config.endX * w;
 
-  const needle = document.getElementById(needleId);
-  if (needle) {
-    const thickness = parseInt(document.getElementById("needleThickness")?.value || 2, 10);
-    const color = document.getElementById("needleColor")?.value || "#000000";
-    needle.style.transition = 'x 0.3s ease';
-    requestAnimationFrame(() => {
-      needle.setAttribute("x", x);
-      needle.setAttribute("width", thickness);
-      needle.setAttribute("fill", color);
-    });
-  }
+  const clamped = Math.max(config.min, Math.min(value, config.max));
+  const frac = (clamped - config.min) / (config.max - config.min);
+  const x = x0 + frac * (x1 - x0);
 
-  const label = document.getElementById(labelId);
-  if (label) label.textContent = `${labelText}: ${Number(value).toFixed(1)} W`;
+  const thick = parseInt($("needleThickness")?.value ?? lastSettings.needleThickness ?? 6);
+  const color = $("needleColor")?.value ?? lastSettings.needleColor ?? "#ff0000";
+
+  needle.setAttribute("x", x);
+  needle.setAttribute("width", thick);
+  needle.style.fill = color;
+
+  label.textContent = `${labelText}: ${value.toFixed(1)} W`;
 }
 
-function updateFirmwareVersion(v) {
-  const el = document.getElementById("firmwareVersion");
-  if (el) el.textContent = `Firmware ${v} — PA0ESH`;
+// ---- Status UI ----
+function updateWsStatus(ok){
+  const dot = $("wsStatusDot");
+  dot.style.backgroundColor = ok ? "#2fa84f" : "orange";
+  dot.classList.toggle("pulse", ok);
 }
-function updateWsStatus(on) {
-  const dot = document.getElementById("wsStatusDot");
-  if (!dot) return;
-  dot.style.backgroundColor = on ? "#22c55e" : "orange";
-  dot.classList.toggle("pulse", on);
+function updateMainPaDisplay(){
+  const btn = $("mainPaToggle");
+  btn.textContent = mainPaState ? "ON" : "OFF";
+  btn.classList.toggle("success", mainPaState);  // ON = groen
+  btn.classList.toggle("danger", !mainPaState);  // OFF = rood
+}
+function updateModeDisplay(isSSB){
+  mode = isSSB ? "SSB" : "DATV";
+  const btn = $("togglePol");
+  btn.textContent = mode;
+  btn.classList.toggle("success", isSSB);  // SSB = groen
+  btn.classList.toggle("danger", !isSSB);  // DATV = rood
+}
+function setSimButton(simOn){
+  simMode = !!simOn;
+  const b = $("simToggle");
+  b.textContent = simMode ? "SIM ON" : "REAL";
+  b.classList.toggle("success", simMode);
+  b.classList.toggle("danger", !simMode);
 }
 
-// WebSocket met auto-reconnect
-function connectWebSocket() {
-  const url = `ws://${window.location.host}/ws`;
-  console.log("[WS] connecting", url);
-  const ws = new WebSocket(url);
-  let backoff = 1000;
+// ---- WebSocket ----
+function connectWS(){
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen  = ()=>{ wsConnected=true; updateWsStatus(true); };
+  ws.onclose = ()=>{ wsConnected=false; updateWsStatus(false); setTimeout(connectWS, 2000); };
+  ws.onerror = ()=> ws.close();
 
-  ws.onopen = () => { console.log("[WS] open"); wsConnected = true; updateWsStatus(true); };
+  ws.onmessage = (ev)=>{
+    const d = JSON.parse(ev.data);
+    if (d.type !== "data") return;
 
-  ws.onmessage = (ev) => {
-    let data; try { data = JSON.parse(ev.data); } catch(e){ return; }
-    if (data.type === "data") {
-      updateNeedle(gaugeConfig.forward,   data.forward,   "needleForward",   "forwardBox",   "FOR");
-      updateNeedle(gaugeConfig.reflected, data.reflected, "needleReflected", "reflectedBox", "REF");
+    updateNeedle(gaugeConfig.forward,   d.forward,   "needleForward",   "forwardBox",   "FOR");
+    updateNeedle(gaugeConfig.reflected, d.reflected, "needleReflected", "reflectedBox", "REF");
 
-      const swrBox = document.getElementById("swrBox");
-      const tempBox= document.getElementById("tempBox");
-      if (swrBox) swrBox.textContent = `SWR: ${Number(data.swr).toFixed(2)}`;
-      if (tempBox) tempBox.textContent = `TEMP: ${Number(data.temperature).toFixed(1)}°C`;
-      if (data.version) updateFirmwareVersion(data.version);
+    const swrBox = $("swrBox");
+    swrBox.textContent = `SWR: ${d.swr.toFixed(2)}`;
+    if (d.swr <= 2.0) swrBox.className = "meter-box swr-green";
+    else if (d.swr <= (d.swrThreshold ?? (lastSettings.swrThreshold ?? 3.5))) swrBox.className = "meter-box swr-orange";
+    else swrBox.className = "meter-box swr-red";
 
-      // DC rails labels
-      const setTxt = (id, txt) => { const el=document.getElementById(id); if (el) el.textContent = txt; };
-      if (typeof data.v5  === "number")  setTxt("v5Box",  `5V: ${data.v5.toFixed(2)} V`);
-      if (typeof data.v12 === "number")  setTxt("v12Box", `12V: ${data.v12.toFixed(2)} V`);
-      if (typeof data.v18 === "number")  setTxt("v18Box", `18V: ${data.v18.toFixed(2)} V`);
-      if (typeof data.v28 === "number")  setTxt("v28Box", `28V: ${data.v28.toFixed(2)} V`);
+    $("tempBox").textContent = `TEMP: ${d.temperature.toFixed(1)}°C`;
 
-      // SIM/REAL label
-      const simBtn = document.getElementById("simToggle");
-      if (simBtn) simBtn.textContent = data.simMode ? "SIM" : "REAL";
+    if (typeof d.v5  !== "undefined") $("v5Box").textContent  = `5V: ${d.v5.toFixed(2)} V`;
+    if (typeof d.v12 !== "undefined") $("v12Box").textContent = `12V: ${d.v12.toFixed(2)} V`;
+    if (typeof d.v18 !== "undefined") $("v18Box").textContent = `18V: ${d.v18.toFixed(2)} V`;
+    if (typeof d.v28 !== "undefined") $("v28Box").textContent = `28V: ${d.v28.toFixed(2)} V`;
 
-      // SWR gedrag
-      if (data.swr <= 2) {
-        swrBox.className = "meter-box bg-dark text-light swr-color-box swr-green";
-        if (swrLatched) swrLatched=false;
-      } else if (data.swr <= data.swrThreshold) {
-        swrBox.className = "meter-box bg-dark text-light swr-color-box swr-orange";
-        if (swrLatched) swrLatched=false;
-      } else {
-        swrBox.className = "meter-box bg-dark text-light swr-color-box swr-red";
-        if (!swrLatched && mainPaState) {
-          fetchNoCache("/api/latch_swr", { method: "POST" })
-            .then(({body})=>{
-              mainPaState=false; updateMainPaDisplay();
-              swrLatched=true; showAlert(`SWR exceeded threshold of ${body?.swrThreshold ?? 3.0}! PA turned off.`, "danger");
-            })
-            .catch(err => showAlert("Error latching SWR: " + err.message, "danger"));
-        }
-      }
+    if (d.version) $("firmwareVersion").textContent = `Firmware ${d.version} — PA0ESH`;
 
-      if (data.mainPaState !== undefined && !swrLatched) {
-        mainPaState = data.mainPaState === "ON";
+    if (typeof d.swrLatched === "boolean") swrLatched = d.swrLatched;
+    if (typeof d.mainPaState !== "undefined"){
+      mainPaState = d.mainPaState === "ON";
+      updateMainPaDisplay();
+    }
+    if (typeof d.mode !== "undefined"){
+      updateModeDisplay(d.mode === "SSB");
+    }
+    if (typeof d.simMode !== "undefined"){
+      setSimButton(!!d.simMode);
+    }
+  };
+}
+
+// ---- Controls ----
+function setupControls(){
+  $("mainPaToggle").onclick = ()=>{
+    if (swrLatched){ modalShow("SWR is gelatched. Reset eerst.","Info"); return; }
+    fetch("/api/main_pa_toggle", { method:"POST", headers: AUTH_HEADERS() })
+      .then(r=>r.json().catch(()=>({ok:false,error:"Bad JSON"})))
+      .then(j=>{
+        if (!j.ok){ modalShow("Toggle PA faalde: "+(j.error||"unknown"),"Fout"); return; }
+        mainPaState = j.state === "ON";
+        updateMainPaDisplay();
+      })
+      .catch(e=> modalShow("Error toggling PA: "+e,"Fout"));
+  };
+
+  $("togglePol").onclick = ()=>{
+    fetch("/api/toggle", { method:"POST", headers: AUTH_HEADERS() })
+      .then(r=>r.text())
+      .then(state=>{
+        // Server geeft "VERTICAL" of iets anders; VERTICAL => SSB
+        const isSSB = state.includes("VERTICAL");
+        updateModeDisplay(isSSB);
+      })
+      .catch(e=> modalShow("Error toggling mode: "+e,"Fout"));
+  };
+
+  $("swrBox").onclick = ()=>{
+    fetch("/api/reset_swr", { method:"POST", headers: AUTH_HEADERS() })
+      .then(r=>r.json().catch(()=>({})))
+      .then(j=>{
+        if (j && j.changed) modalShow("SWR reset uitgevoerd","OK");
+        else modalShow("Geen latch actief","Info");
+      })
+      .catch(e=> modalShow("Error resetting SWR: "+e,"Fout"));
+  };
+
+  $("settingsToggle").onclick = ()=> $("settingsPanel").classList.toggle("hidden");
+  $("otaToggle").onclick      = ()=> $("otaPanel").classList.toggle("hidden");
+
+  $("simToggle").onclick = ()=>{
+    // Probeer server-sim te toggelen; zo niet, fallback lokaal
+    fetch("/api/sim_toggle", { method:"POST", headers: AUTH_HEADERS() })
+      .then(r=>r.json())
+      .then(j=> setSimButton(!!j.simMode))
+      .catch(_=>{
+        setSimButton(!simMode);
+      });
+  };
+
+  // Modal sluiters
+  $("modalClose").onclick = modalHide;
+  $("modalOk").onclick    = modalHide;
+  $("modal").addEventListener("click", (e)=>{ if (e.target === $("modal")) modalHide(); });
+  document.addEventListener("keydown", (e)=>{ if (e.key === "Escape") modalHide(); });
+
+  // Init: modal dicht
+  modalHide();
+}
+
+// ---- Settings helpers ----
+function readNum(id, key, fb){
+  const raw = parseFloat($(id).value);
+  if (Number.isFinite(raw)) return raw;
+  if (typeof lastSettings[key] !== "undefined") return Number(lastSettings[key]);
+  return fb;
+}
+function readInt(id, key, fb){
+  const raw = parseInt($(id).value);
+  if (Number.isInteger(raw)) return raw;
+  if (typeof lastSettings[key] !== "undefined") return parseInt(lastSettings[key])||fb;
+  return fb;
+}
+function readStr(id, key, fb){
+  const raw = $(id).value;
+  if (raw !== "" && raw != null) return raw;
+  if (typeof lastSettings[key] !== "undefined") return String(lastSettings[key]);
+  return fb;
+}
+
+// Alleen visueel toepassen
+function applySettingsLocal(){
+  lastSettings.forwardMax      = readNum("forwardMax","forwardMax",50);
+  lastSettings.reflectedMax    = readNum("reflectedMax","reflectedMax",25);
+  lastSettings.needleThickness = readInt("needleThickness","needleThickness",6);
+  lastSettings.needleColor     = readStr("needleColor","needleColor","#ff0000");
+  lastSettings.swrThreshold    = readNum("swrThreshold","swrThreshold",3.5);
+
+  lastSettings.v5Scale  = readNum("v5Scale","v5Scale",1.6818);
+  lastSettings.v12Scale = readNum("v12Scale","v12Scale",4.0909);
+  lastSettings.v18Scale = readNum("v18Scale","v18Scale",6.4545);
+  lastSettings.v28Scale = readNum("v28Scale","v28Scale",10.0909);
+
+  gaugeConfig.forward.max   = lastSettings.forwardMax;
+  gaugeConfig.reflected.max = lastSettings.reflectedMax;
+
+  $("needleForward").setAttribute("width", lastSettings.needleThickness);
+  $("needleReflected").setAttribute("width", lastSettings.needleThickness);
+  $("needleForward").style.fill = lastSettings.needleColor;
+  $("needleReflected").style.fill = lastSettings.needleColor;
+}
+
+// Laden (met Auth) en merge met UI-waarden
+function loadSettings(){
+  return fetch("/api/load_settings", { headers: AUTH_HEADERS() })
+    .then(r=>{
+      if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      return r.json();
+    })
+    .then(d=>{
+      lastSettings = { ...lastSettings, ...(d||{}) };
+
+      if (typeof lastSettings.forwardMax      !== "undefined") $("forwardMax").value = lastSettings.forwardMax;
+      if (typeof lastSettings.reflectedMax    !== "undefined") $("reflectedMax").value = lastSettings.reflectedMax;
+      if (typeof lastSettings.needleThickness !== "undefined") $("needleThickness").value = lastSettings.needleThickness;
+      if (typeof lastSettings.needleColor     !== "undefined") $("needleColor").value = lastSettings.needleColor;
+      if (typeof lastSettings.swrThreshold    !== "undefined") $("swrThreshold").value = lastSettings.swrThreshold;
+
+      if (typeof lastSettings.v5Scale  !== "undefined") $("v5Scale").value  = lastSettings.v5Scale;
+      if (typeof lastSettings.v12Scale !== "undefined") $("v12Scale").value = lastSettings.v12Scale;
+      if (typeof lastSettings.v18Scale !== "undefined") $("v18Scale").value = lastSettings.v18Scale;
+      if (typeof lastSettings.v28Scale !== "undefined") $("v28Scale").value = lastSettings.v28Scale;
+
+      if (typeof lastSettings.mainPaState !== "undefined"){
+        mainPaState = lastSettings.mainPaState === "ON";
         updateMainPaDisplay();
       }
-    }
-  };
+      if (typeof lastSettings.mode !== "undefined"){
+        updateModeDisplay(lastSettings.mode === "SSB");
+      }
 
-  ws.onclose = () => {
-    console.log("[WS] close; reconnecting…");
-    wsConnected = false;
-    updateWsStatus(false);
-    setTimeout(connectWebSocket, backoff);
-    backoff = Math.min(backoff * 2, 16000);
-  };
-  ws.onerror = () => ws.close();
-}
-
-// UI handlers
-function setupTogglePolListener() {
-  const btn = document.getElementById("togglePol"); if (!btn) return;
-  btn.addEventListener("click", async ()=>{
-    btn.disabled = true;
-    try {
-      const {body} = await fetchNoCache("/api/toggle", { method:"POST" });
-      const vertical = body?.mode === "VERTICAL";
-      btn.textContent = vertical ? "SSB" : "DATV";
-      btn.classList.toggle("bg-success", vertical);
-      btn.classList.toggle("bg-danger", !vertical);
-    } finally { btn.disabled = false; }
-  });
-}
-function setupSwrResetListener() {
-  const swrBox = document.getElementById("swrBox"); if (!swrBox) return;
-  swrBox.addEventListener("click", async ()=>{
-    try {
-      const {body} = await fetchNoCache("/api/reset_swr", { method:"POST" });
-      swrLatched=false;
-      showAlert(body?.changed ? "SWR reset successfully, PA remains off until toggled" : "SWR was not latched", body?.changed ? "success" : "info");
-    } catch(e){ showAlert("Error resetting SWR: "+e.message,"danger"); }
-  });
-}
-function setupMainPaToggleListener() {
-  const btn = document.getElementById("mainPaToggle"); if (!btn) return;
-  btn.addEventListener("click", async ()=>{
-    if (swrLatched) { showAlert("Cannot turn PA on while SWR is latched. Reset SWR first.","warning"); return; }
-    const prev = mainPaState;
-    mainPaState = !mainPaState;
-    updateMainPaDisplay();
-    try {
-      const {body} = await fetchNoCache("/api/main_pa_toggle", { method:"POST" });
-      mainPaState = (body?.state === "ON");
-      updateMainPaDisplay();
-    } catch(e){
-      mainPaState = prev; updateMainPaDisplay();
-      showAlert("Error toggling main PA: "+e.message,"danger");
-    }
-  });
-}
-function setupSimToggle(){
-  const btn = document.getElementById("simToggle"); if (!btn) return;
-  btn.addEventListener("click", async ()=>{
-    btn.disabled = true;
-    try {
-      const {body} = await fetchNoCache("/api/sim_toggle", { method:"POST" });
-      btn.textContent = body?.simMode ? "SIM" : "REAL";
-      showAlert(`Mode: ${body?.simMode ? "Simulator" : "Real ADC"}`, "info");
-    } catch(e){ showAlert("Error toggling sim/real: "+e.message,"danger"); }
-    finally { btn.disabled = false; }
-  });
-}
-function toggleOtaForm(){ const f=document.getElementById("otaForm"); if (f) f.style.display = (f.style.display==="block"?"none":"block"); }
-function toggleSettings(){ const f=document.getElementById("settingsForm"); if (f) f.style.display = (f.style.display==="block"?"none":"block"); }
-
-function updateMainPaDisplay() {
-  const result = document.getElementById("mainPaToggle");
-  if (!result) return;
-  result.textContent = mainPaState ? "ON" : "OFF";
-  result.classList.toggle("bg-success", mainPaState);
-  result.classList.toggle("bg-danger", !mainPaState);
-}
-
-// Settings laden/toepassen
-function applyLoadedSettings(data) {
-  const fwd  = Number(data.forwardMax ?? 50);
-  const ref  = Number(data.reflectedMax ?? 25);
-  const thick= Number.isFinite(Number(data.needleThickness)) ? Number(data.needleThickness) : 2;
-  const color= (typeof data.needleColor === "string" && data.needleColor.length) ? data.needleColor : "#000000";
-  const thr  = Number(data.swrThreshold ?? 3);
-
-  document.getElementById("forwardMax").value     = fwd;
-  document.getElementById("reflectedMax").value   = ref;
-  document.getElementById("needleThickness").value= thick;
-  document.getElementById("needleColor").value    = color;
-  document.getElementById("swrThreshold").value   = thr;
-
-  // NIEUW: scale factors UI sync
-  if (data.v5Scale  != null) document.getElementById("v5Scale").value  = Number(data.v5Scale).toFixed(4);
-  if (data.v12Scale != null) document.getElementById("v12Scale").value = Number(data.v12Scale).toFixed(4);
-  if (data.v18Scale != null) document.getElementById("v18Scale").value = Number(data.v18Scale).toFixed(4);
-  if (data.v28Scale != null) document.getElementById("v28Scale").value = Number(data.v28Scale).toFixed(4);
-
-  gaugeConfig.forward.max   = fwd;
-  gaugeConfig.reflected.max = ref;
-  document.getElementById("needleForward").setAttribute("width", thick);
-  document.getElementById("needleReflected").setAttribute("width", thick);
-  document.getElementById("needleForward").setAttribute("fill", color);
-  document.getElementById("needleReflected").setAttribute("fill", color);
-}
-
-async function syncStatus() {
-  try {
-    const {body} = await fetchNoCache("/api/status");
-    mainPaState = body?.mainPaState === "ON";
-    updateMainPaDisplay();
-    const polBtn = document.getElementById("togglePol");
-    const vertical = body?.pol === "VERTICAL";
-    if (polBtn) {
-      polBtn.textContent = vertical ? "SSB" : "DATV";
-      polBtn.classList.toggle("bg-success", vertical);
-      polBtn.classList.toggle("bg-danger", !vertical);
-    }
-    const simBtn = document.getElementById("simToggle");
-    if (simBtn) simBtn.textContent = body?.simMode ? "SIM" : "REAL";
-    if (body?.version) updateFirmwareVersion(body.version);
-
-    // init rails
-    if (typeof body.v5 === "number")  document.getElementById("v5Box").textContent   = `5V: ${body.v5.toFixed(2)} V`;
-    if (typeof body.v12 === "number") document.getElementById("v12Box").textContent  = `12V: ${body.v12.toFixed(2)} V`;
-    if (typeof body.v18 === "number") document.getElementById("v18Box").textContent  = `18V: ${body.v18.toFixed(2)} V`;
-    if (typeof body.v28 === "number") document.getElementById("v28Box").textContent  = `28V: ${body.v28.toFixed(2)} V`;
-  } catch(e){
-    console.warn("[status] failed:", e.message);
-  }
-}
-
-function applySettings() {
-  const forwardMax   = parseFloat(document.getElementById("forwardMax").value);
-  const reflectedMax = parseFloat(document.getElementById("reflectedMax").value);
-  const thickness    = parseInt(document.getElementById("needleThickness").value, 10);
-  const color        = document.getElementById("needleColor").value;
-  const swrThreshold = parseFloat(document.getElementById("swrThreshold").value);
-
-  // NIEUW: scale factors uit UI
-  const v5Scale      = parseFloat(document.getElementById("v5Scale").value);
-  const v12Scale     = parseFloat(document.getElementById("v12Scale").value);
-  const v18Scale     = parseFloat(document.getElementById("v18Scale").value);
-  const v28Scale     = parseFloat(document.getElementById("v28Scale").value);
-
-  gaugeConfig.forward.max   = forwardMax;
-  gaugeConfig.reflected.max = reflectedMax;
-  document.getElementById("needleForward").setAttribute("width", thickness);
-  document.getElementById("needleReflected").setAttribute("width", thickness);
-  document.getElementById("needleForward").setAttribute("fill", color);
-  document.getElementById("needleReflected").setAttribute("fill", color);
-
-  saveSettingsRobust({
-      forwardMax, reflectedMax, needleThickness: thickness, needleColor: color, swrThreshold,
-      v5Scale, v12Scale, v18Scale, v28Scale
+      applySettingsLocal();
     })
-    .then(() => fetchNoCache("/api/load_settings"))
-    .then(({body}) => { applyLoadedSettings(body); showAlert("Settings applied and saved successfully","success"); })
-    .catch(err => showAlert("Error saving settings: " + err.message, "danger"));
+    .catch(e=> modalShow("Error load settings: "+e, "Fout"));
 }
 
-async function saveSettingsRobust(settings){
-  try {
-    const r = await fetch('/api/save_settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-      body: JSON.stringify(settings)
-    });
-    if (!r.ok) throw new Error('POST failed '+r.status);
-    const after = await fetch('/api/load_settings', { headers:{'Cache-Control':'no-store'} }).then(x=>x.json());
-    const applied =
-      Number(after.forwardMax)      === Number(settings.forwardMax) &&
-      Number(after.reflectedMax)    === Number(settings.reflectedMax) &&
-      Number(after.needleThickness) === Number(settings.needleThickness) &&
-      String(after.needleColor).toLowerCase() === String(settings.needleColor).toLowerCase() &&
-      Number(after.swrThreshold)    === Number(settings.swrThreshold) &&
-      Math.abs(Number(after.v5Scale)  - Number(settings.v5Scale))  < 1e-4 &&
-      Math.abs(Number(after.v12Scale) - Number(settings.v12Scale)) < 1e-4 &&
-      Math.abs(Number(after.v18Scale) - Number(settings.v18Scale)) < 1e-4 &&
-      Math.abs(Number(after.v28Scale) - Number(settings.v28Scale)) < 1e-4;
-    if (applied) return;
-  } catch(e){ /* fallback hieronder */ }
-  const q = new URLSearchParams({
-    forwardMax:       String(settings.forwardMax),
-    reflectedMax:     String(settings.reflectedMax),
-    needleThickness:  String(settings.needleThickness),
-    needleColor:      String(settings.needleColor),
-    swrThreshold:     String(settings.swrThreshold),
-    v5Scale:          String(settings.v5Scale),
-    v12Scale:         String(settings.v12Scale),
-    v18Scale:         String(settings.v18Scale),
-    v28Scale:         String(settings.v28Scale)
-  }).toString();
-  const url = `/api/save_settings?${q}`;
-  const r2 = await fetch(url, { headers: { 'Cache-Control': 'no-store' } });
-  if (!r2.ok) throw new Error('GET fallback failed '+r2.status);
+// Opslaan (met Auth) → merge → herladen
+function saveSettings(){
+  if (isSaving) return;
+  isSaving = true; $("saveSettings").disabled = true;
+
+  const payload = {
+    forwardMax:      readNum("forwardMax","forwardMax",50),
+    reflectedMax:    readNum("reflectedMax","reflectedMax",25),
+    needleThickness: readInt("needleThickness","needleThickness",6),
+    needleColor:     readStr("needleColor","needleColor","#ff0000"),
+    swrThreshold:    readNum("swrThreshold","swrThreshold",3.5),
+
+    v5Scale:  readNum("v5Scale","v5Scale",1.6818),
+    v12Scale: readNum("v12Scale","v12Scale",4.0909),
+    v18Scale: readNum("v18Scale","v18Scale",6.4545),
+    v28Scale: readNum("v28Scale","v28Scale",10.0909)
+  };
+
+  fetch("/api/save_settings", {
+    method:"POST",
+    headers: JSON_HEADERS(),
+    body: JSON.stringify(payload)
+  })
+  .then(r=>{
+    if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    return r.json().catch(()=> ({}));
+  })
+  .then(resp=>{
+    // Als server leeg {} terugstuurt, hou dan payload als waarheid
+    lastSettings = { ...lastSettings, ...payload, ...(resp||{}) };
+    applySettingsLocal();
+    return loadSettings();
+  })
+  .then(()=> modalShow("Instellingen opgeslagen.","OK"))
+  .catch(e=> modalShow("Error save settings: "+e,"Fout"))
+  .finally(()=>{ isSaving=false; $("saveSettings").disabled=false; });
 }
 
-// Init
-document.addEventListener('DOMContentLoaded', async ()=>{
-  setAlertOffset();
+// ---- OTA ----
+function setProgress(pct){
+  const bar = $("otaProgress");
+  const fill= $("otaProgressFill");
+  bar.classList.remove("hidden");
+  fill.style.width = `${pct}%`;
+  if (pct>=100) setTimeout(()=> bar.classList.add("hidden"), 1200);
+}
+function checkForUpdate(){
+  fetch("/api/check_update", { headers: AUTH_HEADERS() })
+    .then(r=>r.json())
+    .then(d=>{
+      if (d.updateAvailable) modalShow(`Update beschikbaar: ${d.latestVersion}`,"Info");
+      else modalShow(`Geen update beschikbaar (huidig: ${d.currentVersion||"?"})`,"Info");
+    })
+    .catch(e=>modalShow("Error check update: "+e,"Fout"));
+}
+function doUpdateFile(){
+  const f = $("otaFile").files?.[0];
+  if (!f){ modalShow("Kies eerst een .bin bestand","Info"); return; }
+  const fd = new FormData();
+  fd.append("update", f, f.name);
+  setProgress(2);
+  fetch("/api/update", { method:"POST", headers: AUTH_HEADERS(), body: fd })
+    .then(r=>r.json().catch(()=>({ok:false})))
+    .then(j=>{
+      if (j.ok){ setProgress(100); modalShow("OTA succesvol — reboot kan even duren","OK"); }
+      else { setProgress(0); modalShow("OTA mislukt","Fout"); }
+    })
+    .catch(e=>{ setProgress(0); modalShow("OTA error: "+e,"Fout"); });
+}
+
+// ---- INIT ----
+function init(){
+  // Init knoppen-kleuren meteen correct (fallback) vóór serverdata
+  updateModeDisplay(true);   // SSB = groen
+  updateMainPaDisplay();     // OFF = rood
+  setSimButton(false);       // REAL
+
   updateUTCTime();
-  await syncStatus();
-  fetchNoCache("/api/load_settings").then(({body})=>applyLoadedSettings(body)).catch(()=>{});
+  updateGaugeDimensions();
+  const img = $("gaugeImage");
+  if (!img.complete) img.onload = updateGaugeDimensions;
 
-  document.getElementById('saveSettingsButton')?.addEventListener('click', ()=>{
-    if (isSaving) return; isSaving=true;
-    const settings = {
-      forwardMax: parseFloat(document.getElementById('forwardMax').value) || 50,
-      reflectedMax: parseFloat(document.getElementById('reflectedMax').value) || 25,
-      needleThickness: parseInt(document.getElementById('needleThickness').value,10) || 2,
-      needleColor: document.getElementById('needleColor').value || '#000000',
-      swrThreshold: parseFloat(document.getElementById('swrThreshold').value) || 3,
-      v5Scale:  parseFloat(document.getElementById('v5Scale').value)  || 1.6818,
-      v12Scale: parseFloat(document.getElementById('v12Scale').value) || 4.0909,
-      v18Scale: parseFloat(document.getElementById('v18Scale').value) || 6.4545,
-      v28Scale: parseFloat(document.getElementById('v28Scale').value) || 10.0909
-    };
-    saveSettingsRobust(settings)
-      .then(()=>fetchNoCache('/api/load_settings'))
-      .then(({body})=>{ applyLoadedSettings(body); showAlert("Settings applied and saved successfully","success"); })
-      .catch(e=>showAlert("Error saving settings: "+e.message,"danger"))
-      .finally(()=>{ isSaving=false; });
-  });
+  connectWS();
+  setupControls();
 
-  document.getElementById("togglePol")    && setupTogglePolListener();
-  document.getElementById("swrBox")       && setupSwrResetListener();
-  document.getElementById("mainPaToggle") && setupMainPaToggleListener();
-  document.getElementById("simToggle")    && setupSimToggle();
+  // Settings knoppen
+  $("applySettings").onclick = ()=> applySettingsLocal();
+  $("saveSettings").onclick  = ()=> saveSettings();
+  $("reloadSettings").onclick= ()=> loadSettings();
 
-  connectWebSocket();
-  window.addEventListener("resize", ()=>{ updateGaugeDimensions(); setAlertOffset(); });
-});
+  // OTA knoppen
+  $("checkUpdate").onclick = ()=> checkForUpdate();
+  $("doUpdate").onclick    = ()=> doUpdateFile();
+
+  // Laad settings (met auth) → zet UI
+  loadSettings();
+
+  // Responsive
+  window.addEventListener("resize", ()=> updateGaugeDimensions());
+}
+
+document.addEventListener("DOMContentLoaded", init);

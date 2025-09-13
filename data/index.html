@@ -1,144 +1,151 @@
 <!DOCTYPE html>
-<!--
-  Project: QO-100 LNB/PA Controller
-  Author: PA0ESH (Erik Schott)
-  Year: 2025
-  License: MIT
-  Version: 015
--->
-<html lang="en">
+<html lang="nl">
 <head>
-  <meta charset="UTF-8"/>
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>QO-100 LNB/PA Controller</title>
-  <link rel="stylesheet" href="/style.css?v=015"/>
+  <title>QO-100 LNB/PA Controller — v018.6</title>
+  <link rel="stylesheet" href="/style.css?v=0186">
 </head>
 <body>
-  <header id="pageHeader">
-    <div class="header-inner">
-      <h1>QO-100 LNB/PA Controller</h1>
-      <p class="clock-text" id="utcTime">UTC: Loading...</p>
+  <!-- MODALE MELDING -->
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal__dialog">
+      <div class="modal__header">
+        <h3 id="modalTitle">Melding</h3>
+        <button id="modalClose" class="modal__close" aria-label="Close">×</button>
+      </div>
+      <div id="modalBody" class="modal__body">...</div>
+      <div class="modal__footer">
+        <button id="modalOk" class="btn primary">OK</button>
+      </div>
     </div>
+  </div>
+
+  <header class="header">
+    <h1>QO-100 LNB/PA Controller</h1>
+    <p id="utcTime" class="clock">UTC: …</p>
   </header>
 
-  <div id="alertAnchor"></div>
-
-  <main>
-    <div class="section gauge-wrapper">
-      <img src="/meter-satpwr.png" alt="Gauge" id="gaugeImage" class="gauge-bg"/>
-      <svg id="gaugeOverlay" class="gauge-overlay">
-        <rect id="needleForward"   x="0" y="30"  width="2" height="80" fill="#000000"/>
-        <rect id="needleReflected" x="0" y="190" width="2" height="80" fill="#000000"/>
-      </svg>
-    </div>
-
-    <div class="section">
-      <div class="power-metrics-container one-row">
-        <div id="forwardBox"   class="meter-box bg-dark text-light">FOR: 0.0 W</div>
-        <div id="reflectedBox" class="meter-box bg-dark text-light">REF: 0.0 W</div>
-        <div id="swrBox"       class="meter-box bg-dark text-light swr-color-box">SWR: 1.00</div>
-        <div id="tempBox"      class="meter-box bg-dark text-light">TEMP: 25.0°C</div>
+  <main class="main">
+    <!-- METER -->
+    <section class="card">
+      <div class="gauge-wrapper">
+        <img id="gaugeImage" class="gauge-bg" src="/meter-satpwr.png" alt="Gauge"/>
+        <svg id="gaugeOverlay" class="gauge-overlay">
+          <rect id="needleForward"  x="0" width="2" />
+          <rect id="needleReflected" x="0" width="2" />
+        </svg>
       </div>
-    </div>
 
-    <!-- DC Rails -->
-    <div class="section">
-      <h2 style="margin:0 0 8px 0; font-size:1.1rem; color:var(--muted); text-align:center;">DC Rails</h2>
-      <div class="power-metrics-container one-row">
-        <div id="v5Box"   class="meter-box bg-dark text-light">5V: 0.00 V</div>
-        <div id="v12Box"  class="meter-box bg-dark text-light">12V: 0.00 V</div>
-        <div id="v18Box"  class="meter-box bg-dark text-light">18V: 0.00 V</div>
-        <div id="v28Box"  class="meter-box bg-dark text-light">28V: 0.00 V</div>
+      <div class="metrics-row">
+        <div id="forwardBox"   class="meter-box">FOR: 0.0 W</div>
+        <div id="reflectedBox" class="meter-box">REF: 0.0 W</div>
+        <div id="swrBox"       class="meter-box swr-green">SWR: 1.00</div>
+        <div id="tempBox"      class="meter-box">TEMP: 25.0°C</div>
       </div>
-    </div>
 
-    <div class="section controls-container">
-      <div class="control-group">
+      <!-- Spanningsrij -->
+      <div class="metrics-row">
+        <div id="v5Box"  class="meter-box">5V: 0.00 V</div>
+        <div id="v12Box" class="meter-box">12V: 0.00 V</div>
+        <div id="v18Box" class="meter-box">18V: 0.00 V</div>
+        <div id="v28Box" class="meter-box">28V: 0.00 V</div>
+      </div>
+    </section>
+
+    <!-- CONTROLS -->
+    <section class="card controls">
+      <div class="control">
         <span>MAIN PA</span>
-        <button id="mainPaToggle" class="toggle-switch bg-danger">OFF</button>
+        <button id="mainPaToggle" class="btn danger">OFF</button>
       </div>
-      <div class="control-group">
+      <div class="control">
         <span>MODE</span>
-        <button id="togglePol" class="toggle-switch bg-success">SSB</button>
+        <button id="togglePol" class="btn success">SSB</button>
       </div>
-    </div>
+      <div class="control">
+        <span>WS-CON</span>
+        <span class="ws-dot" id="wsStatusDot"></span>
+      </div>
+      <div class="control">
+        <button id="settingsToggle" class="btn secondary">SETTINGS</button>
+      </div>
+      <div class="control">
+        <button id="simToggle" class="btn secondary">REAL</button>
+      </div>
+      <div class="control">
+        <button id="otaToggle" class="btn secondary">OTA UPDATE</button>
+      </div>
+    </section>
 
-    <div class="section status-settings-container">
-      <div class="ws-status"><span class="dot" id="wsStatusDot"></span>WS-CON</div>
-      <button class="toggle-switch bg-primary" onclick="toggleSettings()">SETTINGS</button>
-      <button class="toggle-switch bg-primary" onclick="toggleOtaForm()">OTA UPDATE</button>
-      <button id="simToggle" class="toggle-switch bg-primary">SIM</button>
-    </div>
-
-    <div id="settingsForm" class="section form-group" style="display:none;">
-      <h2>Settings</h2>
-
-      <h3 style="margin:8px 0;color:var(--muted)">Gauge</h3>
-      <label for="forwardMax">Forward Power Max (W):</label>
-      <input type="number" id="forwardMax" value="50" step="1" min="1"/>
-
-      <label for="reflectedMax">Reflected Power Max (W):</label>
-      <input type="number" id="reflectedMax" value="25" step="1" min="1"/>
-
-      <label for="needleColor">Needle Color:</label>
-      <input type="color" id="needleColor" value="#000000"/>
-
-      <label for="needleThickness">Needle Thickness (px):</label>
-      <input type="number" id="needleThickness" value="2" min="1" max="255"/>
-
-      <label for="swrThreshold">SWR Threshold (PA OFF):</label>
-      <input type="number" id="swrThreshold" value="3" step="0.1" min="1.5" max="10"/>
-
-      <h3 style="margin:16px 0 8px;color:var(--muted)">Rail Scale Factors (Vin = Vadc × K)</h3>
-      <div class="power-metrics-container">
-        <div>
-          <label for="v5Scale">K (5V):</label>
-          <input type="number" id="v5Scale" value="1.6818" step="0.0001" min="0.1" max="50"/>
-        </div>
-        <div>
-          <label for="v12Scale">K (12V):</label>
-          <input type="number" id="v12Scale" value="4.0909" step="0.0001" min="0.1" max="50"/>
-        </div>
-        <div>
-          <label for="v18Scale">K (18V):</label>
-          <input type="number" id="v18Scale" value="6.4545" step="0.0001" min="0.1" max="50"/>
-        </div>
-        <div>
-          <label for="v28Scale">K (28V):</label>
-          <input type="number" id="v28Scale" value="10.0909" step="0.0001" min="0.1" max="50"/>
-        </div>
+    <!-- SETTINGS -->
+    <section id="settingsPanel" class="card hidden">
+      <h2>Instellingen</h2>
+      <div class="form-grid">
+        <label>Forward Max (W)
+          <input type="number" id="forwardMax" step="1" min="1" value="50">
+        </label>
+        <label>Reflected Max (W)
+          <input type="number" id="reflectedMax" step="1" min="1" value="25">
+        </label>
+        <label>Naald kleur
+          <input type="color" id="needleColor" value="#ff0000">
+        </label>
+        <label>Naald dikte (px)
+          <input type="number" id="needleThickness" min="1" max="255" value="6">
+        </label>
+        <label>SWR drempel (PA OFF)
+          <input type="number" id="swrThreshold" step="0.1" min="1.5" max="10" value="3.5">
+        </label>
       </div>
 
-      <div class="row-buttons">
-        <button id="saveSettingsButton"  class="toggle-switch bg-primary">Save Settings</button>
-        <button id="applySettingsButton" class="toggle-switch bg-success" onclick="applySettings()">Apply Settings</button>
+      <h3>Kalibratie spanningsmeting</h3>
+      <div class="form-grid">
+        <label>5V factor (Vin = Vadc × k)
+          <input type="number" id="v5Scale" step="0.0001" value="1.6818">
+        </label>
+        <label>12V factor
+          <input type="number" id="v12Scale" step="0.0001" value="4.0909">
+        </label>
+        <label>18V factor
+          <input type="number" id="v18Scale" step="0.0001" value="6.4545">
+        </label>
+        <label>28V factor
+          <input type="number" id="v28Scale" step="0.0001" value="10.0909">
+        </label>
       </div>
-    </div>
 
-    <div id="otaForm" class="section form-group" style="display:none;">
+      <div class="row">
+        <button id="applySettings" class="btn success">Apply</button>
+        <button id="saveSettings"  class="btn primary">Save</button>
+        <button id="reloadSettings" class="btn">Reload</button>
+      </div>
+    </section>
+
+    <!-- OTA -->
+    <section id="otaPanel" class="card hidden">
       <h2>OTA Update</h2>
-      <button class="toggle-switch bg-primary" onclick="checkForUpdate()">Check for Update</button>
-      <label for="otaUrl">OTA URL:</label>
-      <input type="text" id="otaUrl" value=""/>
-      <div class="row-buttons">
-        <button class="toggle-switch bg-success" onclick="performUpdate()">Update</button>
-        <button class="toggle-switch bg-danger"  onclick="rollbackFirmware()">Rollback</button>
+      <div class="row">
+        <button id="checkUpdate" class="btn">Check for update</button>
       </div>
-    </div>
-
-    <div id="otaProgress" class="meter-box bg-dark text-light" style="display:none; border:2px solid #0ea5e9;">
-      <span>Firmware update in progress...</span>
-      <div style="width:100%;height:10px;border:1px solid var(--border);margin-top:6px;">
-        <div id="otaProgressBarFill" style="height:100%;width:0%;background-color:#0ea5e9;"></div>
+      <div class="row">
+        <label class="file">
+          <input type="file" id="otaFile" accept=".bin,.bin.gz,.bin.zip"/>
+          <span>Kies firmware (.bin)</span>
+        </label>
+        <button id="doUpdate" class="btn primary">Upload & Flash</button>
       </div>
-      <button class="alert-close" onclick="hideOtaProgress()">×</button>
-    </div>
+      <div id="otaProgress" class="progress hidden">
+        <div id="otaProgressFill"></div>
+      </div>
+      <p class="hint">Tip: gebruik een gecompileerde .bin (Sketch → Export Compiled Binary).</p>
+    </section>
   </main>
 
-  <footer>
-    <p class="firmware-label" id="firmwareVersion">Firmware Version: Loading… — PA0ESH</p>
+  <footer class="footer">
+    <p id="firmwareVersion">Firmware Version: Loading… — PA0ESH</p>
   </footer>
 
-  <script src="/script.js?v=015"></script>
+  <script src="/script.js?v=0186"></script>
 </body>
 </html>
