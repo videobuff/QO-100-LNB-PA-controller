@@ -1,4 +1,4 @@
-// QO-100 Controller – script.js (compat + rails + sync overlay + zichtbare naalden)
+// QO-100 Controller – script.js (compat + rails)
 const el = {
   forwardBox:   document.getElementById('forwardBox'),
   reflectedBox: document.getElementById('reflectedBox'),
@@ -81,77 +81,33 @@ function setSim(sim){
   el.simToggle.classList.toggle('bg-success', !sim);
 }
 
-// --- Overlay ⇄ Image synchronisatie ---
-let overlayW = 0, overlayH = 0;
-function syncOverlayToImage(){
-  const img = document.getElementById('gaugeImage');
-  const svg = el.gaugeOverlay;
-
-  const r = img.getBoundingClientRect();
-  overlayW = Math.max(1, Math.round(r.width));
-  overlayH = Math.max(1, Math.round(r.height));
-
-  svg.setAttribute('viewBox', `0 0 ${overlayW} ${overlayH}`);
-  svg.setAttribute('width', overlayW);
-  svg.setAttribute('height', overlayH);
-
-  // y-positie & hoogte van naalden in percentage van de afbeelding
-  const bandH = Math.round(overlayH * 0.27); // hoogte van een meterband
-  el.forwardNeedle.setAttribute('y', String(Math.round(overlayH * 0.10))); // bovenste band start ~10%
-  el.forwardNeedle.setAttribute('height', String(bandH));
-
-  el.reflectedNeedle.setAttribute('y', String(Math.round(overlayH * 0.63))); // onderste band start ~63%
-  el.reflectedNeedle.setAttribute('height', String(bandH));
-}
-
-// ⚡ Snelle & zichtbare naalden (FOR = geel, REF = cyaan) met halo
 function setNeedles(forW, refW){
-  if (!overlayW) { syncOverlayToImage(); }
-  if (!overlayW) return;
-
-  const left = Math.round(overlayW * 0.02);
-  const right = Math.max(left+1, Math.round(overlayW * 0.98));
-  const MIN_OFFSET = 2; // mini-offset zodat extreem kleine waarden niet “onzichtbaar links” lijken
-
+  const overlay = el.gaugeOverlay.getBoundingClientRect();
+  const left = 20, right = overlay.width - 20;
   const fx = (val, max) => {
     const clamped = Math.max(0, Math.min(1, max>0 ? (val/max) : 0));
-    return Math.round(left + MIN_OFFSET + clamped * (right - left - MIN_OFFSET));
+    return Math.round(left + clamped * (right-left));
   };
-
   const fwdX = fx(forW, parseFloat(el.forwardMax.value)||50);
   const refX = fx(refW, parseFloat(el.reflectedMax.value)||25);
-
-  const userColor = (el.needleColor.value && el.needleColor.value !== '#000000') ? el.needleColor.value : '#ffeb3b';
-  const fwdColor = userColor;   // FOR = userkleur of geel
-  const refColor = '#00e5ff';   // REF = contrasterend cyaan
-  const thick = Math.max(3, parseInt(el.needleThickness.value||3,10));
-
-  // forward
   el.forwardNeedle.setAttribute('x', String(fwdX));
-  el.forwardNeedle.setAttribute('width', String(thick));
-  el.forwardNeedle.setAttribute('fill', fwdColor);
-  el.forwardNeedle.setAttribute('stroke', '#000');
-  el.forwardNeedle.setAttribute('stroke-opacity', '0.35');
-
-  // reflected
   el.reflectedNeedle.setAttribute('x', String(refX));
+
+  const color = el.needleColor.value || '#000000';
+  const thick = parseInt(el.needleThickness.value||2,10);
+  el.forwardNeedle.setAttribute('width', String(thick));
   el.reflectedNeedle.setAttribute('width', String(thick));
-  el.reflectedNeedle.setAttribute('fill', refColor);
-  el.reflectedNeedle.setAttribute('stroke', '#000');
-  el.reflectedNeedle.setAttribute('stroke-opacity', '0.35');
+  el.forwardNeedle.setAttribute('fill', color);
+  el.reflectedNeedle.setAttribute('fill', color);
 }
 
-// ✅ Groen als SWR ≤ threshold, rood als SWR > threshold (robuust)
 function setSWR(swr, threshold){
   const box = el.swrBox;
-  const thr = Number(threshold);
-  const useThr = Number.isFinite(thr) && thr>0 ? thr : 3;
-  const s = Number(swr);
-  const useS = Number.isFinite(s) ? s : 1;
-
-  box.textContent = `SWR: ${useS.toFixed(2)}`;
-  box.classList.remove('swr-ok','swr-bad','swr-warn');
-  if (useS <= useThr) box.classList.add('swr-ok'); else box.classList.add('swr-bad');
+  box.textContent = `SWR: ${swr.toFixed(2)}`;
+  box.classList.remove('swr-ok','swr-warn','swr-bad');
+  if (swr < Math.max(1.0, threshold*0.8)) box.classList.add('swr-ok');
+  else if (swr < threshold)               box.classList.add('swr-warn');
+  else                                    box.classList.add('swr-bad');
 }
 
 // Rails
@@ -250,10 +206,8 @@ function connectWS(){
         el.forwardBox.textContent   = `FOR: ${fwd.toFixed(1)} W`;
         el.reflectedBox.textContent = `REF: ${ref.toFixed(1)} W`;
         el.tempBox.textContent      = `TEMP: ${t.toFixed(1)}°C`;
-
         setNeedles(fwd, ref);
-        setSWR(swr, parseFloat(el.swrThreshold.value));
-
+        setSWR(swr, parseFloat(el.swrThreshold.value)||3);
         setPaState(msg.mainPaState || 'OFF');
         updateRailsFromMsg(msg);
       }
@@ -275,12 +229,6 @@ function init(){
   el.simToggle.addEventListener('click', toggleSim);
   el.saveSettings.addEventListener('click', saveSettings);
   el.applySettings.addEventListener('click', applySettingsLocal);
-
-  // Overlay sync bij start, bij load van de afbeelding en bij resize
-  const img = document.getElementById('gaugeImage');
-  if (img.complete) syncOverlayToImage();
-  else img.onload = syncOverlayToImage;
-  window.addEventListener('resize', syncOverlayToImage);
 
   loadSettings();
   connectWS();

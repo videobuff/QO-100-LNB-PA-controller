@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>QO-100 LNB/PA Controller</title>
-  <link rel="stylesheet" href="/style.css?v=023"/>
+  <link rel="stylesheet" href="/style.css?v=024"/>
 </head>
 <body>
   <!-- vaste alert laag -->
@@ -29,8 +29,16 @@
     <div class="row metrics">
       <div id="forwardBox"   class="meter-box">FOR: 0.0 W</div>
       <div id="reflectedBox" class="meter-box">REF: 0.0 W</div>
-      <div id="swrBox"       class="meter-box swr-box swr-ok">SWR: 1.0</div>
+      <div id="swrBox"       class="meter-box swr-box swr-ok">SWR: 1.00</div>
       <div id="tempBox"      class="meter-box">TEMP: 25.0°C</div>
+    </div>
+
+    <!-- Rails metrics (verschijnt alleen als firmware 'rails' meestuurt) -->
+    <div class="row metrics" id="railsRow" style="display:none;">
+      <div id="rail5Box"  class="meter-box">5V: –.– V</div>
+      <div id="rail12Box" class="meter-box">12V: –.– V</div>
+      <div id="rail18Box" class="meter-box">18V: –.– V</div>
+      <div id="rail28Box" class="meter-box">28V: –.– V</div>
     </div>
 
     <!-- Controls rij -->
@@ -102,6 +110,6 @@
     <p id="firmwareVersion">Firmware Version: Loading… — PA0ESH</p>
   </footer>
 
-  <script src="/script.js?v=023"></script>
+  <script src="/script.js?v=024"></script>
 </body>
 </html>
