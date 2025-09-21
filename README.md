@@ -50,7 +50,8 @@ The QO-100 LNB/PA Controller is designed to control the polarisation and PA rela
 5. Upload firmware (polarisation_xx.ino).
 6. Upload web files via Tools → ESP32 Sketch Data Upload.
 7. Reboot ESP32. If no Wi-Fi found, it creates AP 'QO100-Controller-xxxx'. Connect and configure Wi-Fi.
-8. Log in via browser (default user: admin, password: password).
+9. Log in via browser (default user: admin, password: password).
+    
 ## Usage
 - Dashboard: shows power, SWR and temperature
 - Controls: Main PA ON/OFF and mode toggle
@@ -64,11 +65,7 @@ The QO-100 LNB/PA Controller is designed to control the polarisation and PA rela
 - GPIO26 → Polarisation relay
 - GPIO32–39 → ADC1 inputs for voltage monitoring
 - GPIO4 → Recovery pin (resets login)
-## Voltage dividers:
-- 5V: 15k/22k
-- 12V: 68k/22k
-- 18V: 120k/22k
-- 28V: 200k/22k
+
 #  Troubleshooting
 - 'Not found': LittleFS upload failed or wrong FS used
 - No meter movement: check WS-CON indicator
