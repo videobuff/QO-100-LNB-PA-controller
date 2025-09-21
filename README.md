@@ -22,6 +22,19 @@ The QO-100 LNB/PA Controller is designed to control the polarisation and PA rela
 - Stored in Preferences (persistent)
 - OTA Update support
 - Simulation mode for testing without hardware
+- # Interface pins
+- mainPaPin    = 14;   // PA relais
+- polPin       = 26;   // SSB/DATV
+- RECOVERY_PIN = 4;    // bij LOW op boot -> login reset
+
+// Alleen ADC1 pins gebruiken (ADC2 stoort met WiFi)
+- PIN_FORWARD   = 34;  // ADC1_CH6  (FOR)
+- PIN_REFLECTED = 35;  // ADC1_CH7  (REF)
+- PIN_V5        = 32;  // ADC1_CH4
+- PIN_V12       = 33;  // ADC1_CH5
+- PIN_V18       = 36;  // ADC1_CH0
+- PIN_V28       = 39;  // ADC1_CH3
+- PIN_TEMP      = -1;  // NTC optioneel (ADC1-pin), -1 = uit
 ## Installation from blank ESP32
 1. Install Arduino IDE 2.x and ESP32 board support.
 2. Connect ESP32 via USB.
