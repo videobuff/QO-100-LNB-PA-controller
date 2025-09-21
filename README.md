@@ -35,6 +35,13 @@ The QO-100 LNB/PA Controller is designed to control the polarisation and PA rela
 - PIN_V18       = 36;  // ADC1_CH0
 - PIN_V28       = 39;  // ADC1_CH3
 - PIN_TEMP      = -1;  // NTC optioneel (ADC1-pin), -1 = uit
+
+- 5 V rail → ADC ~3.2 V Rt = 15 kΩ, Rb = 22 kΩ K ≈ 1.68
+- 12 V rail → ADC ~3.2 V Rt = 68 kΩ, Rb = 22 kΩ K ≈ 4.09
+- 18 V rail → ADC ~3.2 V Rt = 120 kΩ, Rb = 22 kΩ K ≈ 6.45
+- 28 V rail → ADC ~3.2 V Rt = 200 kΩ, Rb = 22 kΩ K ≈ 10.09
+- Forward/Reflected 5 V → ADC ~3.2 V Rt = 10 kΩ, Rb = 18 kΩ K ≈ 1.78
+
 ## Installation from blank ESP32
 1. Install Arduino IDE 2.x and ESP32 board support.
 2. Connect ESP32 via USB.
