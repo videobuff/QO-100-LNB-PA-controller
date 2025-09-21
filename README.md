@@ -22,12 +22,12 @@ The QO-100 LNB/PA Controller is designed to control the polarisation and PA rela
 - Stored in Preferences (persistent)
 - OTA Update support
 - Simulation mode for testing without hardware
-- # Interface pins
+# Interface pins
 - mainPaPin    = 14;   // PA relais
 - polPin       = 26;   // SSB/DATV
 - RECOVERY_PIN = 4;    // bij LOW op boot -> login reset
 
-// Alleen ADC1 pins gebruiken (ADC2 stoort met WiFi)
+# Alleen ADC1 pins gebruiken (ADC2 stoort met WiFi)
 - PIN_FORWARD   = 34;  ADC1_CH6  (FOR)
 - PIN_REFLECTED = 35;  ADC1_CH7  (REF)
 - PIN_V5        = 32;  ADC1_CH4
@@ -35,7 +35,7 @@ The QO-100 LNB/PA Controller is designed to control the polarisation and PA rela
 - PIN_V18       = 36;  ADC1_CH0
 - PIN_V28       = 39;  ADC1_CH3
 - PIN_TEMP      = -1;  NTC optioneel (ADC1-pin), -1 = uit
-
+# Resistor bridges for ADC inputs
 - 5 V rail → ADC ~3.2 V Rt = 15 kΩ, Rb = 22 kΩ K ≈ 1.68
 - 12 V rail → ADC ~3.2 V Rt = 68 kΩ, Rb = 22 kΩ K ≈ 4.09
 - 18 V rail → ADC ~3.2 V Rt = 120 kΩ, Rb = 22 kΩ K ≈ 6.45
